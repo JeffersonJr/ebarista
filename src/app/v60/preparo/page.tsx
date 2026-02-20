@@ -1,53 +1,196 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Play, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { Moon, Sun, User, History, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import CountdownOverlay from '@/components/CountdownOverlay';
+import FinalizeButton from '@/components/FinalizeButton';
 
 export default function PreparoV60Page() {
-  const [coffeeAmount, setCoffeeAmount] = useState(20);
-  const [ratio, setRatio] = useState(15);
-  const [selectedProfile, setSelectedProfile] = useState('Equilibrado');
-  const [selectedIntensity, setSelectedIntensity] = useState('Médio');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userEmail] = useState('jeffersoncamposbeirajunior@gmail.com');
   const [showCountdown, setShowCountdown] = useState(false);
 
-  const ratios = [13, 15, 17];
-  const waterAmount = coffeeAmount * ratio;
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isFinalPhase, setIsFinalPhase] = useState(false);
+  const [drainageSeconds, setDrainageSeconds] = useState(0);
 
-  const intensityLevels = [
-    { name: 'Leve', pours: 1, level: 1 },
-    { name: 'Suave', pours: 2, level: 2 },
-    { name: 'Médio', pours: 3, level: 3 },
-    { name: 'Forte', pours: 4, level: 4 },
-    { name: 'Intenso', pours: 5, level: 5 }
-  ];
+  const STEP_SECONDS = 50;
+  const TOTAL_STEPS = 3;
+  const TIMER_MAX_SECONDS = STEP_SECONDS * TOTAL_STEPS;
+  const circleRadius = 88;
+  const circleCircumference = useMemo(() => 2 * Math.PI * circleRadius, []);
 
-  const flavorProfiles = [
-    { name: 'Vibrante', description: 'Mais acidez', ratio: '66/34', percentage: 66, firstPart: 66, secondPart: 34 },
-    { name: 'Brilhante', description: 'Levemente ácido', ratio: '58/42', percentage: 58, firstPart: 58, secondPart: 42 },
-    { name: 'Equilibrado', description: 'Balanceado', ratio: '50/50', percentage: 50, firstPart: 50, secondPart: 50 },
-    { name: 'Aveludado', description: 'Levemente doce', ratio: '42/58', percentage: 42, firstPart: 42, secondPart: 58 },
-    { name: 'Licoroso', description: 'Mais doçura', ratio: '34/66', percentage: 34, firstPart: 34, secondPart: 66 },
-  ];
+  const lastBeepedSecondRef = useRef<number | null>(null);
+
+  const audioContext = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+
+    type WindowWithWebkitAudioContext = Window & {
+      webkitAudioContext?: typeof AudioContext;
+    };
+
+    const w = window as WindowWithWebkitAudioContext;
+    const Ctx = window.AudioContext ?? w.webkitAudioContext;
+    return Ctx ? new Ctx() : null;
+  }, []);
+
+  const enableAudio = useCallback(() => {
+    if (!audioContext) return;
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => undefined);
+    }
+  }, [audioContext]);
+
+  const playTone = useCallback((opts: {
+    frequency: number;
+    type: OscillatorType;
+    durationSeconds: number;
+    gain: number;
+  }) => {
+    if (!audioContext) return;
+
+    // iOS/Safari sometimes requires resume after user gesture
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => undefined);
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = opts.frequency;
+    oscillator.type = opts.type;
+
+    gainNode.gain.setValueAtTime(opts.gain, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + opts.durationSeconds);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + opts.durationSeconds);
+  }, [audioContext]);
+
+  const playTickBeep = useCallback(() => {
+    playTone({ frequency: 800, type: 'sine', durationSeconds: 0.12, gain: 0.22 });
+  }, [playTone]);
+
+  const playStartBeep = useCallback(() => {
+    playTone({ frequency: 1200, type: 'triangle', durationSeconds: 0.18, gain: 0.28 });
+  }, [playTone]);
 
   const handleStart = () => {
+    enableAudio();
     setShowCountdown(true);
+  };
+
+  const handleReset = () => {
+    setIsTimerRunning(false);
+    setElapsedSeconds(0);
+    setShowCountdown(false);
+    setIsFinalPhase(false);
+    setDrainageSeconds(0);
+    lastBeepedSecondRef.current = null;
+  };
+
+  const handleFinalize = () => {
+    // Aqui você pode adicionar a lógica para finalizar
+    // Por exemplo, salvar o tempo, mostrar uma mensagem, etc.
+    console.log('Finalizado com tempo extra:', getTimerText());
   };
 
   const handleCountdownComplete = () => {
     setShowCountdown(false);
-    // Here you can start the actual preparation logic
+    enableAudio();
+    playStartBeep();
+    setElapsedSeconds(0);
+    setIsTimerRunning(true);
+    lastBeepedSecondRef.current = null;
   };
 
+  useEffect(() => {
+    if (!isTimerRunning) return;
+
+    const id = window.setInterval(() => {
+      setElapsedSeconds((prev) => {
+        if (prev >= TIMER_MAX_SECONDS) {
+          setIsTimerRunning(false);
+          setIsFinalPhase(true);
+          setDrainageSeconds(0);
+          return TIMER_MAX_SECONDS;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [isTimerRunning, TIMER_MAX_SECONDS]);
+
+  // Contador progressivo da fase de drenagem
+  useEffect(() => {
+    if (!isFinalPhase) return;
+
+    const id = window.setInterval(() => {
+      setDrainageSeconds((prev) => prev + 1);
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [isFinalPhase]);
+
+  const getTimerText = () => {
+    if (isFinalPhase) {
+      const mins = Math.floor(drainageSeconds / 60);
+      const secs = drainageSeconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    const mins = Math.floor(elapsedSeconds / 60);
+    const secs = elapsedSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const stepLabel = useMemo(() => {
+    const step = Math.min(TOTAL_STEPS, Math.floor(elapsedSeconds / STEP_SECONDS) + 1);
+    return `Passo ${step} de ${TOTAL_STEPS}`;
+  }, [elapsedSeconds, STEP_SECONDS, TOTAL_STEPS]);
+
+  const stepElapsedSeconds = useMemo(() => {
+    if (elapsedSeconds === 0) return 0;
+    const mod = elapsedSeconds % STEP_SECONDS;
+    return mod === 0 ? STEP_SECONDS : mod;
+  }, [elapsedSeconds, STEP_SECONDS]);
+
+  useEffect(() => {
+    if (!isTimerRunning) return;
+    if (lastBeepedSecondRef.current === elapsedSeconds) return;
+
+    if (stepElapsedSeconds >= STEP_SECONDS - 5 && stepElapsedSeconds <= STEP_SECONDS - 1) {
+      playTickBeep();
+      lastBeepedSecondRef.current = elapsedSeconds;
+      return;
+    }
+
+    if (stepElapsedSeconds === STEP_SECONDS && elapsedSeconds !== 0) {
+      playStartBeep();
+      lastBeepedSecondRef.current = elapsedSeconds;
+    }
+  }, [elapsedSeconds, isTimerRunning, playStartBeep, playTickBeep, stepElapsedSeconds, STEP_SECONDS]);
+
+  const progress = useMemo(() => {
+    return Math.min(1, stepElapsedSeconds / STEP_SECONDS);
+  }, [stepElapsedSeconds, STEP_SECONDS]);
+
+  const progressDashOffset = useMemo(() => {
+    return circleCircumference * (1 - progress);
+  }, [circleCircumference, progress]);
+
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-[#09090b]' : 'bg-gray-50'} ${isDarkMode ? 'text-[#fafafa]' : 'text-gray-900'} p-4`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#09090b]' : 'bg-gray-50'} ${isDarkMode ? 'text-[#fafafa]' : 'text-gray-900'} p-4 pb-24`}>
       <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
           <Link 
@@ -157,54 +300,77 @@ export default function PreparoV60Page() {
                 stroke="#00d2ff"
                 strokeWidth="12"
                 fill="none"
-                strokeDasharray={`${2 * Math.PI * 88}`}
-                strokeDashoffset={`${2 * Math.PI * 88 * 0.75}`}
+                strokeDasharray={circleCircumference}
+                strokeDashoffset={progressDashOffset}
                 strokeLinecap="round"
                 className="transition-all duration-1000 ease-linear"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-black tabular-nums">0:00</span>
-              <span className="text-sm text-gray-500 mt-1">Passo 1 de 3</span>
+              <span className="text-4xl font-black tabular-nums">
+                {getTimerText()}
+              </span>
+              <span className="text-sm text-gray-500 mt-1">
+                {isFinalPhase ? 'Drenagem Adicional' : stepLabel}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Card de Informações */}
         <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-6 text-center`}>
-          <h3 className="text-lg font-medium text-gray-400 mb-4">Fase do Sabor</h3>
+          <h3 className="text-lg font-medium text-gray-400 mb-4">
+            {isFinalPhase ? 'Drenagem Adicional' : 'Fase do Sabor'}
+          </h3>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-center">
-              <span className="text-5xl font-bold text-orange-500">Adicione <span className="text-5xl font-bold text-orange-500">+60g</span></span>
-            </div>
-            
-            <div className="flex items-center justify-center">
-              <span className="text-lg font-medium">Total na Balança: <span className="text-lg font-bold">60g</span></span>
-            </div>
+            {isFinalPhase ? (
+              <div className="flex flex-col items-center">
+                <span className="text-2xl font-bold text-orange-500">contador progressivo</span>
+                <span className="text-lg font-medium">iniciando no 00:00 até o usuário clicar no botão finalizar</span>
+                <span className="text-lg font-medium">Toque para finalizar com tempo extra</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-center">
+                  <span className="text-5xl font-bold text-orange-500">Adicione <span className="text-5xl font-bold text-orange-500">+60g</span></span>
+                </div>
+                
+                <div className="flex items-center justify-center">
+                  <span className="text-lg font-medium">Total na Balança: <span className="text-lg font-bold">60g</span></span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Botões de Ação */}
-        <div className="flex gap-3 mt-6">
-          <button className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}>
-            <RotateCcw className="w-5 h-5" />
-            <span className="font-medium">Reiniciar</span>
-          </button>
-          
-          <button 
-            onClick={handleStart}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-cyan-500 hover:bg-cyan-600'} text-white transition-colors`}
-          >
-            <Play className="w-5 h-5" fill="white" />
-            <span className="font-medium">Iniciar</span>
-          </button>
-          
-          <button className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}>
-            <ChevronLeft className="w-5 h-5 rotate-180" />
-            <span className="font-medium">Próximo</span>
-          </button>
-        </div>
+        {isFinalPhase ? (
+          <FinalizeButton isDarkMode={isDarkMode} onClick={handleFinalize} />
+        ) : (
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={handleReset}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}
+            >
+              <RotateCcw className="w-5 h-5" />
+              <span className="font-medium">Reiniciar</span>
+            </button>
+            
+            <button 
+              onClick={handleStart}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-cyan-500 hover:bg-cyan-600'} text-white transition-colors`}
+            >
+              <Play className="w-5 h-5" fill="white" />
+              <span className="font-medium">Iniciar</span>
+            </button>
+            
+            <button className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors`}>
+              <ChevronLeft className="w-5 h-5 rotate-180" />
+              <span className="font-medium">Próximo</span>
+            </button>
+          </div>
+        )}
 
         {/* Cards de Passos */}
         <div className="mt-8 mb-24">

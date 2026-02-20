@@ -682,11 +682,9 @@ export default function Home() {
                 {coffeeMethods.map((method) => {
                   const content = (
                     <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-xl p-6 relative h-full transition-all hover:scale-[1.02]`}>
-                      {method.id !== 'v60' && (
-                        <div className="absolute top-2 right-2">
-                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">Em breve</span>
-                        </div>
-                      )}
+                      <div className="absolute top-2 right-2">
+                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">Em breve</span>
+                      </div>
                       <div className="w-16 h-16 mb-4 mx-auto">
                         <Image 
                           src={method.icon} 

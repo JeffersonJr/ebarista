@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface CountdownOverlayProps {
   isVisible: boolean;
@@ -10,56 +10,83 @@ interface CountdownOverlayProps {
 export default function CountdownOverlay({ isVisible, onComplete }: CountdownOverlayProps) {
   const [countdown, setCountdown] = useState(3);
 
-  const playBeep = useCallback(() => {
-    // Create a simple beep sound using Web Audio API
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  const audioContext = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+
+    type WindowWithWebkitAudioContext = Window & {
+      webkitAudioContext?: typeof AudioContext;
+    };
+
+    const w = window as WindowWithWebkitAudioContext;
+    const Ctx = window.AudioContext ?? w.webkitAudioContext;
+    return Ctx ? new Ctx() : null;
+  }, []);
+
+  const playBeep = (frequency: number) => {
+    if (!audioContext) return;
+
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    
+
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 800;
+
+    oscillator.frequency.value = frequency;
     oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-    
+
+    gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.12);
+
     oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.1);
-  }, []);
+    oscillator.stop(audioContext.currentTime + 0.12);
+  };
 
   useEffect(() => {
     if (!isVisible) return;
 
-    const timer = setInterval(() => {
-      setCountdown((prev: number) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Play 3 beeps when reaching 0
-          playBeep();
-          setTimeout(() => playBeep(), 200);
-          setTimeout(() => playBeep(), 400);
-          
-          // Call onComplete after beeps
-          setTimeout(() => {
-            onComplete();
-          }, 600);
-          
-          return 0;
-        }
-        
-        // Beep on each number change
-        if (prev > 1) {
-          playBeep();
-        }
-        
-        return prev - 1;
-      });
-    }, 1000);
+    setCountdown(3);
+    // 1 bip no "3"
+    playBeep(800);
 
-    return () => clearInterval(timer);
-  }, [isVisible, playBeep, onComplete]);
+    let cancelled = false;
+
+    const tick = (next: number) => {
+      if (cancelled) return;
+      setCountdown(next);
+
+      if (next === 2) {
+        // 1 bip no "2"
+        playBeep(800);
+        setTimeout(() => tick(1), 1000);
+        return;
+      }
+
+      if (next === 1) {
+        // 1 bip no "1"
+        playBeep(800);
+        // Fecha o overlay e inicia o preparo logo após o último bip
+        setTimeout(() => {
+          if (cancelled) return;
+          setCountdown(0);
+          onCompleteRef.current();
+        }, 500);
+        return;
+      }
+    };
+
+    const timeoutId = setTimeout(() => tick(2), 1000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]);
 
   if (!isVisible) return null;
 
