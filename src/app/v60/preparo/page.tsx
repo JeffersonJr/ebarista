@@ -8,20 +8,89 @@ import Link from 'next/link';
 import CountdownOverlay from '@/components/CountdownOverlay';
 import FinalizeButton from '@/components/FinalizeButton';
 
+type FlavorProfileKey = 'vibrante-leve' | 'vibrante-suave' | 'vibrante-medio' | 'vibrante-forte' | 'vibrante-intenso';
+
+type Step = {
+  add: number;
+  total: number;
+  percentage: number;
+};
+
+type FlavorProfile = {
+  name: string;
+  steps: Step[];
+};
+
 export default function PreparoV60Page() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [userEmail] = useState('jeffersoncamposbeirajunior@gmail.com');
+  const [userEmail] = useState('jeffersonbeirajunior@gmail.com');
   const [showCountdown, setShowCountdown] = useState(false);
+  const [flavorProfile, setFlavorProfile] = useState<FlavorProfileKey>('vibrante-leve'); // perfil padrão
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isFinalPhase, setIsFinalPhase] = useState(false);
   const [drainageSeconds, setDrainageSeconds] = useState(0);
 
+  // Configurações dos perfis de sabor
+  const flavorProfiles: Record<FlavorProfileKey, FlavorProfile> = {
+    'vibrante-leve': {
+      name: 'Vibrante e Leve',
+      steps: [
+        { add: 79, total: 79, percentage: 40 },
+        { add: 41, total: 120, percentage: 40 },
+        { add: 180, total: 300, percentage: 60 }
+      ]
+    },
+    'vibrante-suave': {
+      name: 'Vibrante e Suave',
+      steps: [
+        { add: 79, total: 79, percentage: 40 },
+        { add: 41, total: 120, percentage: 40 },
+        { add: 90, total: 210, percentage: 60 },
+        { add: 90, total: 300, percentage: 60 }
+      ]
+    },
+    'vibrante-medio': {
+      name: 'Vibrante e Médio',
+      steps: [
+        { add: 79, total: 79, percentage: 40 },
+        { add: 41, total: 120, percentage: 40 },
+        { add: 60, total: 180, percentage: 60 },
+        { add: 60, total: 240, percentage: 60 },
+        { add: 60, total: 300, percentage: 60 }
+      ]
+    },
+    'vibrante-forte': {
+      name: 'Vibrante e Forte',
+      steps: [
+        { add: 79, total: 79, percentage: 40 },
+        { add: 41, total: 120, percentage: 40 },
+        { add: 45, total: 165, percentage: 60 },
+        { add: 45, total: 210, percentage: 60 },
+        { add: 45, total: 255, percentage: 60 },
+        { add: 45, total: 300, percentage: 60 }
+      ]
+    },
+    'vibrante-intenso': {
+      name: 'Vibrante e Intenso',
+      steps: [
+        { add: 60, total: 60, percentage: 40 },
+        { add: 60, total: 120, percentage: 40 },
+        { add: 36, total: 156, percentage: 60 },
+        { add: 36, total: 192, percentage: 60 },
+        { add: 36, total: 228, percentage: 60 },
+        { add: 36, total: 264, percentage: 60 },
+        { add: 36, total: 300, percentage: 60 }
+      ]
+    }
+  };
+
+  const currentProfile = flavorProfiles[flavorProfile];
+  const TOTAL_STEPS = currentProfile.steps.length;
   const STEP_SECONDS = 50;
-  const TOTAL_STEPS = 3;
   const TIMER_MAX_SECONDS = STEP_SECONDS * TOTAL_STEPS;
   const circleRadius = 88;
   const circleCircumference = useMemo(() => 2 * Math.PI * circleRadius, []);
@@ -154,10 +223,30 @@ export default function PreparoV60Page() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const stepLabel = useMemo(() => {
-    const step = Math.min(TOTAL_STEPS, Math.floor(elapsedSeconds / STEP_SECONDS) + 1);
-    return `Passo ${step} de ${TOTAL_STEPS}`;
+  const currentStep = useMemo(() => {
+    if (elapsedSeconds === 0) return 0;
+    return Math.min(TOTAL_STEPS, Math.floor(elapsedSeconds / STEP_SECONDS) + 1);
   }, [elapsedSeconds, STEP_SECONDS, TOTAL_STEPS]);
+
+  const stepLabel = useMemo(() => {
+    return `Passo ${currentStep} de ${TOTAL_STEPS}`;
+  }, [currentStep, TOTAL_STEPS]);
+
+  const stepInstructions = useMemo(() => {
+    const instructions = [''];
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+      instructions.push(`Adicione +${currentProfile.steps[i-1].add}g`);
+    }
+    return instructions;
+  }, [currentProfile, TOTAL_STEPS]);
+
+  const stepTotals = useMemo(() => {
+    const totals = [''];
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+      totals.push(`${currentProfile.steps[i-1].total}g`);
+    }
+    return totals;
+  }, [currentProfile, TOTAL_STEPS]);
 
   const stepElapsedSeconds = useMemo(() => {
     if (elapsedSeconds === 0) return 0;
@@ -207,8 +296,23 @@ export default function PreparoV60Page() {
           </button>
         </div>
 
-        <div className="flex items-center justify-center flex-1">
+        <div className="flex flex-col items-center justify-center flex-1">
           <h1 className="text-xl font-bold tracking-tight">Preparo V60</h1>
+          <select 
+            value={flavorProfile}
+            onChange={(e) => setFlavorProfile(e.target.value as FlavorProfileKey)}
+            className={`mt-1 text-sm px-3 py-1 rounded-lg border ${
+              isDarkMode 
+                ? 'bg-[#18181b] border-gray-700 text-gray-300' 
+                : 'bg-white border-gray-200 text-gray-700'
+            }`}
+          >
+            <option value="vibrante-leve">Vibrante e Leve</option>
+            <option value="vibrante-suave">Vibrante e Suave</option>
+            <option value="vibrante-medio">Vibrante e Médio</option>
+            <option value="vibrante-forte">Vibrante e Forte</option>
+            <option value="vibrante-intenso">Vibrante e Intenso</option>
+          </select>
         </div>
 
         <div className="flex items-center gap-2 relative">
@@ -318,26 +422,22 @@ export default function PreparoV60Page() {
         </div>
 
         {/* Card de Informações */}
-        <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-6 text-center`}>
-          <h3 className="text-lg font-medium text-gray-400 mb-4">
-            {isFinalPhase ? 'Drenagem Adicional' : 'Fase do Sabor'}
-          </h3>
-          
+        <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-6 text-center mb-6`}>          
           <div className="space-y-3">
             {isFinalPhase ? (
               <div className="flex flex-col items-center">
-                <span className="text-2xl font-bold text-orange-500">contador progressivo</span>
-                <span className="text-lg font-medium">iniciando no 00:00 até o usuário clicar no botão finalizar</span>
+                <span className="text-2xl font-bold text-orange-500">Drenagem adicional</span>
+                <span className="text-5xl font-bold text-orange-500">{getTimerText()}</span>
                 <span className="text-lg font-medium">Toque para finalizar com tempo extra</span>
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-center">
-                  <span className="text-5xl font-bold text-orange-500">Adicione <span className="text-5xl font-bold text-orange-500">+60g</span></span>
+                  <span className="text-5xl font-bold text-orange-500">{stepInstructions[currentStep]}</span>
                 </div>
                 
                 <div className="flex items-center justify-center">
-                  <span className="text-lg font-medium">Total na Balança: <span className="text-lg font-bold">60g</span></span>
+                  <span className="text-lg font-medium">Total na Balança: <span className="text-lg font-bold">{stepTotals[currentStep]}</span></span>
                 </div>
               </>
             )}
@@ -377,53 +477,35 @@ export default function PreparoV60Page() {
           <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wider mb-4 text-left">Todos os Passos</h3>
           
           <div className="space-y-3">
-            {/* Card 01 - Ativo */}
-            <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-3 border-2 border-cyan-500`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-3xl font-black">01</div>
-                  <div className="text-left">
-                    <div className="text-2xl font-bold text-orange-500">+79g</div>
-                    <div className="text-lg font-medium">total 79g</div>
+            {currentProfile.steps.map((step: Step, index: number) => {
+              const stepNumber = index + 1;
+              const isActive = currentStep === stepNumber;
+              
+              return (
+                <div key={stepNumber} className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-3 ${
+                  isActive ? 'border-2 border-cyan-500' : 'opacity-60'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="text-3xl font-black">{String(stepNumber).padStart(2, '0')}</div>
+                      <div className="text-left">
+                        <div className={`text-2xl font-bold ${
+                          isActive ? 'text-orange-500' : 'text-gray-400'
+                        }`}>+{step.add}g</div>
+                        <div className={`text-lg font-medium ${
+                          isActive ? '' : 'text-gray-500'
+                        }`}>total {step.total}g</div>
+                      </div>
+                    </div>
+                    <div className={`text-2xl font-bold px-3 py-1 rounded-lg ${
+                      isActive ? 'text-cyan-500 bg-cyan-500/10' : 'text-gray-400 bg-gray-100'
+                    }`}>
+                      {step.percentage}%
+                    </div>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-cyan-500 bg-cyan-500/10 px-3 py-1 rounded-lg">
-                  40%
-                </div>
-              </div>
-            </div>
-
-            {/* Card 02 - Inativo */}
-            <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-3 opacity-60`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-3xl font-black">02</div>
-                  <div className="text-left">
-                    <div className="text-2xl font-bold text-gray-400">+79g</div>
-                    <div className="text-lg font-medium text-gray-500">total 158g</div>
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-lg">
-                  40%
-                </div>
-              </div>
-            </div>
-
-            {/* Card 03 - Inativo */}
-            <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-3 opacity-60`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-3xl font-black">03</div>
-                  <div className="text-left">
-                    <div className="text-2xl font-bold text-gray-400">+79g</div>
-                    <div className="text-lg font-medium text-gray-500">total 237g</div>
-                  </div>
-                </div>
-                <div className="text-2xl font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-lg">
-                  60%
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </main>

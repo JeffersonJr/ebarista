@@ -2,10 +2,12 @@
 
 import { Coffee, History, User } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentView = searchParams.get('view');
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t z-50 bg-gray-50 dark:bg-[#09090b] border-gray-200 dark:border-gray-800">
@@ -23,7 +25,7 @@ export default function BottomNav() {
           <Link 
             href="/?view=history" 
             className={`flex flex-col items-center p-2 rounded-lg ${
-              pathname === '/' && typeof window !== 'undefined' && window.location.search.includes('history') 
+              pathname === '/' && currentView === 'history'
                 ? 'text-cyan-500' 
                 : 'text-gray-600 dark:text-gray-400'
             }`}
@@ -34,7 +36,7 @@ export default function BottomNav() {
           <Link 
             href="/?view=profile" 
             className={`flex flex-col items-center p-2 rounded-lg ${
-              pathname === '/' && typeof window !== 'undefined' && window.location.search.includes('profile') 
+              pathname === '/' && currentView === 'profile'
                 ? 'text-cyan-500' 
                 : 'text-gray-600 dark:text-gray-400'
             }`}
