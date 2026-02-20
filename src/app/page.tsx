@@ -253,10 +253,28 @@ export default function Home() {
                     dropdown.classList.toggle('hidden');
                   }
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-gray-200 text-gray-700'}`}
+                className="flex items-center gap-2"
               >
-                <div className="w-8 h-8 rounded-full bg-[#4298B5] flex items-center justify-center text-white font-semibold">
-                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    {/* David Bowie inspired avatar */}
+                    {/* Face */}
+                    <ellipse cx="50" cy="50" rx="35" ry="40" fill="#F4D1AE"/>
+                    {/* Hair - Ziggy Stardust style */}
+                    <path d="M15 30 Q 20 15, 35 20 Q 50 10, 65 20 Q 80 15, 85 30 Q 82 25, 75 28 Q 60 18, 50 25 Q 40 18, 25 28 Q 18 25, 15 30" fill="#C41E3A"/>
+                    {/* Eyes - distinctive mismatched colors */}
+                    <circle cx="38" cy="45" r="4" fill="#4A90E2"/>
+                    <circle cx="62" cy="45" r="4" fill="#8B4513"/>
+                    {/* Eyebrows - thin and arched */}
+                    <path d="M32 38 Q 38 35, 44 38" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                    <path d="M56 38 Q 62 35, 68 38" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                    {/* Nose */}
+                    <path d="M50 45 L 48 55 L 52 55" stroke="#D4A574" strokeWidth="2" fill="none"/>
+                    {/* Mouth - thin smile */}
+                    <path d="M42 65 Q 50 68, 58 65" stroke="#E74C3C" strokeWidth="2" fill="none"/>
+                    {/* Lightning bolt makeup - Aladdin Sane style */}
+                    <path d="M45 25 L 48 35 L 52 32 L 55 45" fill="#FFD700" stroke="#FFA500" strokeWidth="1"/>
+                  </svg>
                 </div>
               </button>
               
@@ -267,8 +285,26 @@ export default function Home() {
               >
                 <div className="p-4 border-b ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}">
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-[#4298B5] flex items-center justify-center text-white font-semibold">
-                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    <div className="w-10 h-10 rounded-full overflow-hidden">
+                      <svg viewBox="0 0 100 100" className="w-full h-full">
+                        {/* David Bowie inspired avatar */}
+                        {/* Face */}
+                        <ellipse cx="50" cy="50" rx="35" ry="40" fill="#F4D1AE"/>
+                        {/* Hair - Ziggy Stardust style */}
+                        <path d="M15 30 Q 20 15, 35 20 Q 50 10, 65 20 Q 80 15, 85 30 Q 82 25, 75 28 Q 60 18, 50 25 Q 40 18, 25 28 Q 18 25, 15 30" fill="#C41E3A"/>
+                        {/* Eyes - distinctive mismatched colors */}
+                        <circle cx="38" cy="45" r="4" fill="#4A90E2"/>
+                        <circle cx="62" cy="45" r="4" fill="#8B4513"/>
+                        {/* Eyebrows - thin and arched */}
+                        <path d="M32 38 Q 38 35, 44 38" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                        <path d="M56 38 Q 62 35, 68 38" stroke="#8B4513" strokeWidth="2" fill="none"/>
+                        {/* Nose */}
+                        <path d="M50 45 L 48 55 L 52 55" stroke="#D4A574" strokeWidth="2" fill="none"/>
+                        {/* Mouth - thin smile */}
+                        <path d="M42 65 Q 50 68, 58 65" stroke="#E74C3C" strokeWidth="2" fill="none"/>
+                        {/* Lightning bolt makeup - Aladdin Sane style */}
+                        <path d="M45 25 L 48 35 L 52 32 L 55 45" fill="#FFD700" stroke="#FFA500" strokeWidth="1"/>
+                      </svg>
                     </div>
                     <div>
                       <div className={`font-semibold ${isDarkMode ? 'text-slate-100' : 'text-gray-900'}`}>
