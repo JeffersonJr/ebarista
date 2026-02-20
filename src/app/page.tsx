@@ -1,14 +1,19 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect, useCallback } from 'react';
-import { Coffee, Timer, Clock, Plus, Play, Pause, RotateCcw, Settings, History } from 'lucide-react';
+import { Coffee, History, Sun, Moon, LogIn, User } from 'lucide-react';
 
 interface CoffeeMethod {
   id: string;
   name: string;
   description: string;
+  subtitle?: string;
   ratio: number;
   defaultSteps: TimerStep[];
+  color: string;
+  borderColor: string;
+  iconColor: string;
 }
 
 interface TimerStep {
@@ -38,12 +43,22 @@ interface BrewingSession {
   completed: boolean;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
 const coffeeMethods: CoffeeMethod[] = [
   {
     id: 'v60',
     name: 'Hario V60',
-    description: 'Método versátil com controle total sobre extração',
+    description: 'Controle preciso de sabor e intensidade utilizando o método 4:6',
+    subtitle: 'Tetsu Kasuya',
     ratio: 15,
+    color: 'bg-orange-100',
+    borderColor: 'border-orange-400',
+    iconColor: 'text-orange-600',
     defaultSteps: [
       { id: '1', name: 'Bloom', duration: 30, waterAmount: 60, type: 'bloom' },
       { id: '2', name: '1º Ataque', duration: 45, waterAmount: 150, type: 'pour' },
@@ -52,22 +67,14 @@ const coffeeMethods: CoffeeMethod[] = [
     ]
   },
   {
-    id: 'chemex',
-    name: 'Chemex',
-    description: 'Extração limpa e saborosa com filtro espesso',
-    ratio: 16,
-    defaultSteps: [
-      { id: '1', name: 'Bloom', duration: 45, waterAmount: 80, type: 'bloom' },
-      { id: '2', name: '1º Ataque', duration: 60, waterAmount: 200, type: 'pour' },
-      { id: '3', name: '2º Ataque', duration: 60, waterAmount: 120, type: 'pour' },
-      { id: '4', name: 'Finalização', duration: 45, waterAmount: 0, type: 'wait' }
-    ]
-  },
-  {
     id: 'french-press',
     name: 'Prensa Francesa',
-    description: 'Corpo encorpado e aromas intensos',
+    description: 'Café encorpado, limpo e sem resíduos',
+    subtitle: 'James Hoffmann',
     ratio: 17,
+    color: 'bg-green-100',
+    borderColor: 'border-[#00C389]',
+    iconColor: 'text-[#00C389]',
     defaultSteps: [
       { id: '1', name: 'Adicionar Água', duration: 30, waterAmount: 0, type: 'pour' },
       { id: '2', name: 'Bloom', duration: 60, waterAmount: 0, type: 'bloom' },
@@ -77,48 +84,65 @@ const coffeeMethods: CoffeeMethod[] = [
     ]
   },
   {
-    id: 'aeropress',
-    name: 'Aeropress',
-    description: 'Versatilidade extrema com pressão',
-    ratio: 14,
+    id: 'custom',
+    name: 'Receita Personalizada',
+    description: 'Monte sua receita de percolação com tempos e despejos personalizados',
+    subtitle: 'Crie seu próprio método',
+    ratio: 15,
+    color: 'bg-blue-100',
+    borderColor: 'border-[#4298B5]',
+    iconColor: 'text-[#4298B5]',
     defaultSteps: [
-      { id: '1', name: 'Bloom', duration: 15, waterAmount: 50, type: 'bloom' },
-      { id: '2', name: 'Mexer', duration: 10, waterAmount: 0, type: 'stir' },
-      { id: '3', name: 'Adicionar Água', duration: 30, waterAmount: 150, type: 'pour' },
-      { id: '4', name: 'Esperar', duration: 60, waterAmount: 0, type: 'wait' },
-      { id: '5', name: 'Pressionar', duration: 30, waterAmount: 0, type: 'pour' }
+      { id: '1', name: 'Passo 1', duration: 30, waterAmount: 60, type: 'bloom' },
+      { id: '2', name: 'Passo 2', duration: 45, waterAmount: 150, type: 'pour' },
+      { id: '3', name: 'Passo 3', duration: 45, waterAmount: 90, type: 'pour' }
     ]
   }
 ];
 
 export default function Home() {
-  const [selectedMethod, setSelectedMethod] = useState<CoffeeMethod | null>(null);
-  const [coffeeAmount, setCoffeeAmount] = useState(20);
-  const [waterAmount, setWaterAmount] = useState(300);
-  const [ratio, setRatio] = useState(15);
   const [customRecipes, setCustomRecipes] = useState<Recipe[]>([]);
   const [brewingHistory, setBrewingHistory] = useState<BrewingSession[]>([]);
-  const [currentView, setCurrentView] = useState<'methods' | 'calculator' | 'timer' | 'recipes' | 'history'>('methods');
+  const [currentView, setCurrentView] = useState<'home' | 'methods' | 'calculator' | 'timer' | 'recipes' | 'history' | 'profile'>('home');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<CoffeeMethod | null>(null);
+  const [selectedRecipe] = useState<Recipe | null>(null);
   
   // Timer states
   const [isRunning, setIsRunning] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
-    const savedRecipes = localStorage.getItem('ebarista-recipes');
-    const savedHistory = localStorage.getItem('ebarista-history');
-    
-    if (savedRecipes) {
-      setCustomRecipes(JSON.parse(savedRecipes));
-    }
-    
-    if (savedHistory) {
-      setBrewingHistory(JSON.parse(savedHistory));
-    }
+    const loadData = () => {
+      const savedRecipes = localStorage.getItem('ebarista-recipes');
+      const savedHistory = localStorage.getItem('ebarista-history');
+      
+      if (savedRecipes) {
+        try {
+          const recipes = JSON.parse(savedRecipes);
+          setCustomRecipes(recipes);
+        } catch (error) {
+          console.error('Error loading recipes:', error);
+        }
+      }
+      
+      if (savedHistory) {
+        try {
+          const history = JSON.parse(savedHistory);
+          setBrewingHistory(history);
+        } catch (error) {
+          console.error('Error loading history:', error);
+        }
+      }
+    };
+
+    // Use setTimeout to defer setState calls
+    const timeoutId = setTimeout(loadData, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Save to localStorage when data changes
@@ -134,11 +158,12 @@ export default function Home() {
     }
   }, [brewingHistory]);
 
-  // Calculate water amount based on coffee and ratio
-  useEffect(() => {
-    const calculatedWater = coffeeAmount * ratio;
-    setWaterAmount(calculatedWater);
-  }, [coffeeAmount, ratio]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleTimerComplete = useCallback(() => {
     if (selectedRecipe) {
@@ -182,215 +207,355 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isRunning, timeRemaining, currentStep, selectedRecipe, handleTimerComplete]);
 
-  const startTimer = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setCurrentStep(0);
-    setTimeRemaining(recipe.steps[0].duration);
-    setTotalTime(recipe.steps.reduce((acc, step) => acc + step.duration, 0));
-    setIsRunning(true);
+  const handleLogin = () => {
+    // Simulação de login
+    setIsLoggedIn(true);
+    setUser({ id: '1', name: 'Usuário Teste', email: 'teste@ebarista.com' });
   };
 
-  const pauseTimer = () => {
-    setIsRunning(false);
-  };
-
-  const resumeTimer = () => {
-    setIsRunning(true);
-  };
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    setCurrentStep(0);
-    setTimeRemaining(0);
-    setSelectedRecipe(null);
-  };
-
-  const createCustomRecipe = useCallback((method: CoffeeMethod) => {
-    const newRecipe: Recipe = {
-      id: Date.now().toString(),
-      name: `${method.name} - Personalizado`,
-      methodId: method.id,
-      coffeeAmount,
-      waterAmount,
-      ratio,
-      steps: [...method.defaultSteps],
-      createdAt: new Date()
-    };
-    
-    setCustomRecipes((prev) => [newRecipe, ...prev]);
-    setCurrentView('recipes');
-  }, [coffeeAmount, waterAmount, ratio]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getStepIcon = (type: TimerStep['type']) => {
-    switch (type) {
-      case 'bloom': return <Coffee className="w-5 h-5" />;
-      case 'pour': return <Timer className="w-5 h-5" />;
-      case 'stir': return <Settings className="w-5 h-5" />;
-      case 'wait': return <Clock className="w-5 h-5" />;
-      default: return <Timer className="w-5 h-5" />;
-    }
-  };
-
-  const getStepColor = (type: TimerStep['type']) => {
-    switch (type) {
-      case 'bloom': return 'text-yellow-400';
-      case 'pour': return 'text-cyan-400';
-      case 'stir': return 'text-purple-400';
-      case 'wait': return 'text-gray-400';
-      default: return 'text-gray-400';
-    }
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUser(null);
+    setCurrentView('home');
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gray-50'} ${isDarkMode ? 'text-slate-100' : 'text-gray-900'} p-4`}>
       {/* Header */}
-      <header className="glass-card p-6 mb-6">
+      <header className="p-4 mb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo ebarista.svg" alt="e.barista" className="w-24 h-12" />
+          {/* Theme Toggle */}
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`p-2 rounded-lg ${isDarkMode ? 'text-yellow-400' : 'text-gray-700'}`}
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+
+          {/* Logo */}
+          <div className="flex flex-col items-center">
+            <Image 
+              src="/logo ebarista.svg" 
+              alt="e.barista" 
+              width={230} 
+              height={115}
+              className="w-58 h-29"
+            />
           </div>
-          
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-2">
+
+          {/* Login Button */}
+          {isLoggedIn ? (
+            <div className="relative">
+              <button
+                onClick={() => {
+                  const dropdown = document.getElementById('user-dropdown');
+                  if (dropdown) {
+                    dropdown.classList.toggle('hidden');
+                  }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-gray-200 text-gray-700'}`}
+              >
+                <div className="w-8 h-8 rounded-full bg-[#4298B5] flex items-center justify-center text-white font-semibold">
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              </button>
+              
+              {/* Dropdown Menu */}
+              <div 
+                id="user-dropdown"
+                className={`absolute right-0 mt-2 w-64 rounded-lg shadow-lg ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-gray-200'} hidden z-50`}
+              >
+                <div className="p-4 border-b ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 rounded-full bg-[#4298B5] flex items-center justify-center text-white font-semibold">
+                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div>
+                      <div className={`font-semibold ${isDarkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                        {user?.name}
+                      </div>
+                      <div className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-sm text-green-600 font-medium">Conectado</span>
+                  </div>
+                </div>
+                
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      setCurrentView('profile');
+                      document.getElementById('user-dropdown')?.classList.add('hidden');
+                    }}
+                    className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-gray-100 text-gray-700'} transition-colors`}
+                  >
+                    <User className="w-4 h-4" />
+                    Perfil
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentView('history');
+                      document.getElementById('user-dropdown')?.classList.add('hidden');
+                    }}
+                    className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-gray-100 text-gray-700'} transition-colors`}
+                  >
+                    <History className="w-4 h-4" />
+                    Histórico de Extrações
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 ${isDarkMode ? 'hover:bg-slate-700 text-red-400' : 'hover:bg-gray-100 text-red-600'} transition-colors border-t ${isDarkMode ? 'border-slate-700' : 'border-gray-200'} mt-2 pt-3`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sair
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
             <button
-              onClick={() => setCurrentView('methods')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                currentView === 'methods' 
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
+              onClick={handleLogin}
+              className="flex items-center gap-2 text-[#4298B5] hover:text-[#357a99] transition-colors"
             >
-              Métodos
+              Entrar
+              <LogIn className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setCurrentView('calculator')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                currentView === 'calculator' 
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Calculadora
-            </button>
-            <button
-              onClick={() => setCurrentView('recipes')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                currentView === 'recipes' 
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Receitas
-            </button>
-            <button
-              onClick={() => setCurrentView('history')}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                currentView === 'history' 
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Histórico
-            </button>
-          </nav>
-        </div>
-        
-        {/* Mobile Navigation */}
-        <div className="flex md:hidden gap-2 mt-4">
-          <button
-            onClick={() => setCurrentView('methods')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-              currentView === 'methods' 
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Métodos
-          </button>
-          <button
-            onClick={() => setCurrentView('calculator')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-              currentView === 'calculator' 
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Calc
-          </button>
-          <button
-            onClick={() => setCurrentView('recipes')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-              currentView === 'recipes' 
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Receitas
-          </button>
-          <button
-            onClick={() => setCurrentView('history')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm transition-all ${
-              currentView === 'history' 
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Hist
-          </button>
+          )}
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto">
-        {/* Methods View */}
-        {currentView === 'methods' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Métodos de Preparo</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              {coffeeMethods.map((method) => (
-                <div key={method.id} className="glass-card p-6 hover:scale-[1.02] transition-transform">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-cyan-400">{method.name}</h3>
-                      <p className="text-slate-400 text-sm mt-1">{method.description}</p>
-                    </div>
-                    <Coffee className="w-6 h-6 text-cyan-400" />
-                  </div>
-                  
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="text-sm">
-                      <span className="text-slate-500">Ratio:</span>
-                      <span className="text-slate-200 ml-2">1:{method.ratio}</span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="text-slate-500">Etapas:</span>
-                      <span className="text-slate-200 ml-2">{method.defaultSteps.length}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
+        {/* Timer View */}
+        {currentView === 'timer' && (
+          <div className="space-y-6">
+            <header className="mb-6">
+              <div className="flex items-center justify-between">
+                {/* Back Button + Theme Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentView('methods')}
+                    className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-gray-200 text-gray-700'}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
+                  >
+                    {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                  </button>
+                </div>
+
+                {/* Logo */}
+                <div className="flex flex-col items-center">
+                  <Image 
+                    src="/logo ebarista.svg" 
+                    alt="e.barista" 
+                    width={96} 
+                    height={48}
+                    className="w-24 h-12"
+                  />
+                  <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-orange-500' : 'text-orange-600'} mt-2`}>
+                    {selectedMethod?.name || 'Timer'}
+                  </h2>
+                </div>
+
+                {/* Login Button */}
+                {isLoggedIn ? (
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm ${isDarkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      {user?.name}
+                    </span>
                     <button
-                      onClick={() => {
-                        setSelectedMethod(method);
-                        setRatio(method.ratio);
-                        setCurrentView('calculator');
+                      onClick={handleLogout}
+                      className={`px-4 py-2 rounded-lg ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-gray-200 text-gray-700'}`}
+                    >
+                      Sair
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleLogin}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4298B5] text-white hover:bg-[#357a99] transition-colors"
+                  >
+                    Entrar
+                    <LogIn className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </header>
+
+            {/* Timer Content - 100% height */}
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+              <div className={`${isDarkMode ? 'glass-card' : 'bg-white shadow-lg'} rounded-2xl p-12 max-w-md w-full mx-auto`}>
+                {/* Timer Display */}
+                <div className="text-center mb-8">
+                  <div className={`text-6xl font-bold mb-2 ${isDarkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                    {formatTime(timeRemaining || 0)}
+                  </div>
+                  <div className={`text-lg ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                    {currentStep < (selectedRecipe?.steps.length || 0) 
+                      ? selectedRecipe?.steps[currentStep]?.name 
+                      : 'Preparo Concluído'
+                    }
+                  </div>
+                </div>
+
+                {/* Step Progress */}
+                <div className="mb-8">
+                  <div className="flex justify-between mb-2">
+                    <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      Etapa {currentStep + 1} de {selectedRecipe?.steps.length || 0}
+                    </span>
+                    <span className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      {selectedRecipe?.steps[currentStep]?.duration || 0}s
+                    </span>
+                  </div>
+                  <div className={`w-full h-2 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                    <div 
+                      className="h-2 rounded-full bg-[#4298B5] transition-all duration-1000"
+                      style={{
+                        width: selectedRecipe?.steps[currentStep] 
+                          ? `${((selectedRecipe.steps[currentStep].duration - (timeRemaining || 0)) / selectedRecipe.steps[currentStep].duration) * 100}%`
+                          : '0%'
                       }}
-                      className="btn-primary flex-1 text-sm"
-                    >
-                      Usar Método
-                    </button>
+                    />
+                  </div>
+                </div>
+
+                {/* Control Buttons */}
+                <div className="flex gap-4 justify-center">
+                  {!isRunning ? (
                     <button
-                      onClick={() => createCustomRecipe(method)}
-                      className="btn-secondary flex-1 text-sm"
+                      onClick={() => setIsRunning(true)}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#4298B5] text-white rounded-lg hover:bg-[#357a99] transition-colors"
                     >
-                      Personalizar
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Iniciar
                     </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsRunning(false)}
+                      className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Pausar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setIsRunning(false);
+                      setCurrentStep(0);
+                      setTimeRemaining(selectedRecipe?.steps[0]?.duration || 0);
+                    }}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-lg ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-200 text-gray-700'} hover:opacity-80 transition-opacity`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reiniciar
+                  </button>
+                </div>
+
+                {/* Step List */}
+                <div className="mt-8 space-y-2">
+                  {selectedRecipe?.steps.map((step, index) => (
+                    <div 
+                      key={step.id} 
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        index === currentStep 
+                          ? isDarkMode ? 'bg-slate-700' : 'bg-blue-100'
+                          : index < currentStep
+                          ? isDarkMode ? 'bg-slate-800' : 'bg-green-100'
+                          : isDarkMode ? 'bg-slate-900' : 'bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          step.type === 'bloom' ? 'bg-yellow-500 text-white' :
+                          step.type === 'pour' ? 'bg-cyan-500 text-white' :
+                          step.type === 'stir' ? 'bg-purple-500 text-white' :
+                          'bg-gray-500 text-white'
+                        }`}>
+                          {step.type === 'bloom' ? 'B' :
+                           step.type === 'pour' ? 'P' :
+                           step.type === 'stir' ? 'M' : 'E'}
+                        </div>
+                        <span className={`text-sm ${
+                          index === currentStep 
+                            ? isDarkMode ? 'text-slate-100 font-semibold' : 'text-gray-900 font-semibold'
+                            : index < currentStep
+                            ? isDarkMode ? 'text-slate-300' : 'text-gray-700'
+                            : isDarkMode ? 'text-slate-500' : 'text-gray-500'
+                        }`}>
+                          {step.name}
+                        </span>
+                      </div>
+                      <span className={`text-xs ${
+                        index === currentStep 
+                          ? isDarkMode ? 'text-slate-300' : 'text-gray-700'
+                          : index < currentStep
+                          ? isDarkMode ? 'text-slate-400' : 'text-gray-600'
+                          : isDarkMode ? 'text-slate-500' : 'text-gray-500'
+                      }`}>
+                        {step.duration}s
+                        {step.waterAmount > 0 && ` • ${step.waterAmount}ml`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Home View */}
+        {currentView === 'home' && (
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-3 gap-4">
+              {coffeeMethods.map((method) => (
+                <div
+                  key={method.id}
+                  className={`${method.color} ${method.borderColor} border rounded-xl p-6 hover:scale-[1.02] hover:shadow-lg transition-all duration-200 cursor-pointer`}
+                  onClick={() => {
+                    setSelectedMethod(method);
+                    setCurrentView('methods');
+                  }}
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Icon */}
+                    <div className="flex-shrink-0">
+                      <Coffee className={`w-8 h-8 ${method.iconColor}`} />
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {method.name}
+                      </h3>
+                      {method.subtitle && (
+                        <p className="text-sm text-gray-700 font-bold mt-1">
+                          {method.subtitle}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-800 mt-2 leading-relaxed">
+                        {method.description}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -398,410 +563,46 @@ export default function Home() {
           </div>
         )}
 
-        {/* Calculator View */}
-        {currentView === 'calculator' && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold mb-4">Calculadora de Proporções</h2>
+        {/* Bottom Navigation */}
+        <div className={`fixed bottom-0 left-0 right-0 p-4 border-t ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+          <div className="flex justify-around items-center max-w-6xl mx-auto">
+            <button
+              onClick={() => setCurrentView('home')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'home'
+                  ? 'bg-[#4298B5] text-white'
+                  : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Coffee className="w-5 h-5" />
+              <span className="text-xs">Explorar</span>
+            </button>
             
-            <div className="glass-card p-6">
-              <div className="grid md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">
-                    Café (gramas)
-                  </label>
-                  <input
-                    type="number"
-                    value={coffeeAmount}
-                    onChange={(e) => setCoffeeAmount(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-lg bg-slate-800/50 border border-slate-700 focus:border-cyan-500 focus:outline-none"
-                    min="1"
-                    max="100"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">
-                    Ratio (água:café)
-                  </label>
-                  <input
-                    type="number"
-                    value={ratio}
-                    onChange={(e) => setRatio(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-lg bg-slate-800/50 border border-slate-700 focus:border-cyan-500 focus:outline-none"
-                    min="10"
-                    max="20"
-                    step="0.5"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">
-                    Água (ml)
-                  </label>
-                  <div className="w-full px-4 py-3 rounded-lg bg-slate-800/30 border border-slate-700 text-cyan-400 font-semibold">
-                    {waterAmount}
-                  </div>
-                </div>
-              </div>
-              
-              {selectedMethod && (
-                <div className="mt-6 p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-400">Método selecionado</p>
-                      <p className="font-semibold text-cyan-400">{selectedMethod.name}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const recipe: Recipe = {
-                          id: Date.now().toString(),
-                          name: `${selectedMethod.name} - Rápido`,
-                          methodId: selectedMethod.id,
-                          coffeeAmount,
-                          waterAmount,
-                          ratio,
-                          steps: selectedMethod.defaultSteps,
-                          createdAt: new Date()
-                        };
-                        startTimer(recipe);
-                        setCurrentView('timer');
-                      }}
-                      className="btn-primary"
-                    >
-                      Iniciar Preparo
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => isLoggedIn ? setCurrentView('history') : handleLogin()}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'history'
+                  ? 'bg-[#4298B5] text-white'
+                  : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <History className="w-5 h-5" />
+              <span className="text-xs">Meu Histórico</span>
+            </button>
             
-            {/* Quick Ratios */}
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Ratios Rápidos</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[12, 14, 15, 16, 17, 18].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRatio(r)}
-                    className={`p-3 rounded-lg border transition-all ${
-                      ratio === r
-                        ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400'
-                        : 'border-slate-700 text-slate-400 hover:border-slate-600'
-                    }`}
-                  >
-                    1:{r}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              onClick={() => isLoggedIn ? setCurrentView('profile') : handleLogin()}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                currentView === 'profile'
+                  ? 'bg-[#4298B5] text-white'
+                  : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <User className="w-5 h-5" />
+              <span className="text-xs">Perfil</span>
+            </button>
           </div>
-        )}
-
-        {/* Timer View */}
-        {currentView === 'timer' && selectedRecipe && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Cronômetro de Preparo</h2>
-              <button
-                onClick={() => setCurrentView('methods')}
-                className="btn-secondary"
-              >
-                Voltar
-              </button>
-            </div>
-            
-            <div className="glass-card p-8">
-              {/* Recipe Info */}
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-cyan-400 mb-2">{selectedRecipe.name}</h3>
-                <div className="flex items-center justify-center gap-6 text-slate-400">
-                  <span>{selectedRecipe.coffeeAmount}g café</span>
-                  <span>•</span>
-                  <span>{selectedRecipe.waterAmount}ml água</span>
-                  <span>•</span>
-                  <span>1:{selectedRecipe.ratio}</span>
-                </div>
-              </div>
-              
-              {/* Timer Display */}
-              <div className="text-center mb-8">
-                <div className="text-6xl font-bold font-mono text-cyan-400 mb-4">
-                  {formatTime(timeRemaining)}
-                </div>
-                
-                {/* Progress Bar */}
-                <div className="w-full bg-slate-800 rounded-full h-2 mb-4">
-                  <div 
-                    className="bg-gradient-to-r from-cyan-500 to-cyan-600 h-2 rounded-full transition-all duration-1000"
-                    style={{ 
-                      width: `${((totalTime - timeRemaining) / totalTime) * 100}%` 
-                    }}
-                  />
-                </div>
-                
-                {/* Current Step */}
-                {selectedRecipe.steps[currentStep] && (
-                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${getStepColor(selectedRecipe.steps[currentStep].type)}`}>
-                    {getStepIcon(selectedRecipe.steps[currentStep].type)}
-                    <span className="font-semibold">
-                      {selectedRecipe.steps[currentStep].name}
-                    </span>
-                    {selectedRecipe.steps[currentStep].waterAmount > 0 && (
-                      <span className="text-sm">
-                        ({selectedRecipe.steps[currentStep].waterAmount}ml)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* Steps Timeline */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold">Etapas</h4>
-                  <span className="text-sm text-slate-400">
-                    {currentStep + 1} / {selectedRecipe.steps.length}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {selectedRecipe.steps.map((step, index) => (
-                    <div
-                      key={step.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                        index === currentStep
-                          ? 'bg-cyan-500/20 border border-cyan-500/30'
-                          : index < currentStep
-                          ? 'bg-slate-800/30 opacity-50'
-                          : 'bg-slate-800/20'
-                      }`}
-                    >
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                        index === currentStep
-                          ? 'bg-cyan-500 text-slate-900'
-                          : index < currentStep
-                          ? 'bg-slate-700 text-slate-400'
-                          : 'bg-slate-800 text-slate-500'
-                      }`}>
-                        {index < currentStep ? '✓' : index + 1}
-                      </div>
-                      <div className="flex items-center gap-2 flex-1">
-                        <span className={getStepColor(step.type)}>
-                          {getStepIcon(step.type)}
-                        </span>
-                        <span className="flex-1">{step.name}</span>
-                        <span className="text-sm text-slate-400">
-                          {formatTime(step.duration)}
-                        </span>
-                        {step.waterAmount > 0 && (
-                          <span className="text-sm text-cyan-400">
-                            +{step.waterAmount}ml
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Controls */}
-              <div className="flex gap-3">
-                {!isRunning ? (
-                  timeRemaining > 0 ? (
-                    <button
-                      onClick={resumeTimer}
-                      className="btn-primary flex-1 flex items-center justify-center gap-2"
-                    >
-                      <Play className="w-5 h-5" />
-                      Retomar
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => startTimer(selectedRecipe)}
-                      className="btn-primary flex-1 flex items-center justify-center gap-2"
-                    >
-                      <Play className="w-5 h-5" />
-                      Iniciar
-                    </button>
-                  )
-                ) : (
-                  <button
-                    onClick={pauseTimer}
-                    className="btn-secondary flex-1 flex items-center justify-center gap-2"
-                  >
-                    <Pause className="w-5 h-5" />
-                    Pausar
-                  </button>
-                )}
-                <button
-                  onClick={resetTimer}
-                  className="btn-secondary flex items-center justify-center gap-2 px-6"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                  Reiniciar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Recipes View */}
-        {currentView === 'recipes' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Minhas Receitas</h2>
-              <button
-                onClick={() => setCurrentView('methods')}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Nova Receita
-              </button>
-            </div>
-            
-            {customRecipes.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <Coffee className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-400 mb-2">
-                  Nenhuma receita personalizada
-                </h3>
-                <p className="text-slate-500 mb-6">
-                  Crie suas próprias receitas personalizadas a partir dos métodos disponíveis
-                </p>
-                <button
-                  onClick={() => setCurrentView('methods')}
-                  className="btn-primary"
-                >
-                  Explorar Métodos
-                </button>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-4">
-                {customRecipes.map((recipe) => {
-                  const method = coffeeMethods.find(m => m.id === recipe.methodId);
-                  return (
-                    <div key={recipe.id} className="glass-card p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold text-cyan-400">{recipe.name}</h3>
-                          <p className="text-slate-400 text-sm">{method?.name}</p>
-                        </div>
-                        <Coffee className="w-6 h-6 text-cyan-400" />
-                      </div>
-                      
-                      <div className="flex items-center gap-4 mb-4 text-sm">
-                        <span className="text-slate-400">{recipe.coffeeAmount}g</span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-slate-400">{recipe.waterAmount}ml</span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-slate-400">1:{recipe.ratio}</span>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            startTimer(recipe);
-                            setCurrentView('timer');
-                          }}
-                          className="btn-primary flex-1 text-sm"
-                        >
-                          Iniciar Preparo
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCoffeeAmount(recipe.coffeeAmount);
-                            setWaterAmount(recipe.waterAmount);
-                            setRatio(recipe.ratio);
-                            setCurrentView('calculator');
-                          }}
-                          className="btn-secondary flex-1 text-sm"
-                        >
-                          Ver Detalhes
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* History View */}
-        {currentView === 'history' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Histórico de Preparos</h2>
-              <button
-                onClick={() => setBrewingHistory([])}
-                className="btn-secondary text-sm"
-              >
-                Limpar Histórico
-              </button>
-            </div>
-            
-            {brewingHistory.length === 0 ? (
-              <div className="glass-card p-12 text-center">
-                <History className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-400 mb-2">
-                  Nenhum preparo registrado
-                </h3>
-                <p className="text-slate-500">
-                  Seus preparos aparecerão aqui após completar o cronômetro
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {brewingHistory.map((session) => {
-                  const recipe = [...customRecipes, ...coffeeMethods.map(m => ({
-                    id: m.id,
-                    name: m.name,
-                    methodId: m.id,
-                    coffeeAmount: 20,
-                    waterAmount: 300,
-                    ratio: m.ratio,
-                    steps: m.defaultSteps,
-                    createdAt: new Date()
-                  }))].find(r => r.id === session.recipeId);
-                  
-                  return (
-                    <div key={session.id} className="glass-card p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-cyan-400">
-                            {recipe?.name || 'Preparo'}
-                          </h4>
-                          <div className="flex items-center gap-3 text-sm text-slate-400 mt-1">
-                            <span>{new Date(session.startTime).toLocaleDateString('pt-BR')}</span>
-                            <span>•</span>
-                            <span>{new Date(session.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            {session.completed && (
-                              <>
-                                <span>•</span>
-                                <span className="text-green-400">Concluído</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {recipe && (
-                          <button
-                            onClick={() => {
-                              startTimer(recipe);
-                              setCurrentView('timer');
-                            }}
-                            className="btn-primary text-sm"
-                          >
-                            Repetir
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        </div>
       </main>
     </div>
   );
